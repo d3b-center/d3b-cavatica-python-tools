@@ -20,6 +20,3 @@ def fetch_locations(filepath_or_buffer, out_location):
     # Save the output file
 
     out.to_csv(out_location)
-
-
-breakpoint()
