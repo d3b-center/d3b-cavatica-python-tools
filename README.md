@@ -16,7 +16,7 @@ Using pip
 
 This script imports files from a cavatica volume to a cavatica project (and creates the project if nescessary)
 
-#### Usage:
+#### Usage
 
 ```bash
 python import_files_from_volume.py SD_12345678 "Project Name" --file_list filelist.csv
