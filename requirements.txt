@@ -1,0 +1,7 @@
+requests
+boto3
+psycopg2
+pandas
+tqdm
+sevenbridges-python
+d3b_utils @ git+https://github.com/d3b-center/d3b-utils-python.git

@@ -21,8 +21,8 @@ Steps to reproduce the behavior:
 A clear and concise description of what you expected to happen.
 
 **Computer (please complete the following information):**
- - OS Version: [e.g. macOS 10.14.6]
- - Python Version [e.g. Python 3.7.1]
+- OS Version: [e.g. macOS 10.14.6]
+- Python Version [e.g. Python 3.7.1]
 
 **Additional info**
 Add any other context about the problem here.
