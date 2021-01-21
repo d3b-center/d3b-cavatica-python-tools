@@ -33,7 +33,7 @@ parser.add_argument(
     "--db_connection_url",
     metavar="connection url to query",
     type=str,
-    help="""URL to the database that will be queried to retrieve file 
+    help="""URL to the database that will be queried to retrieve file
             information. e.g.:
             postgresql://username:password@localhost:5432/postgres
             """,
@@ -112,9 +112,7 @@ new_project_name = args.project
 # What are my funding sources?
 billing_groups = api.billing_groups.query()
 
-my_billing_group = [
-    bg for bg in billing_groups.all() if bg.name == args.billing_group
-]
+my_billing_group = [bg for bg in billing_groups.all() if bg.name == args.billing_group]
 if not my_billing_group:
     print(
         "Billing Group {} does not exist, check name / mounting".format(
@@ -154,9 +152,7 @@ else:
 
     # (re)list all projects, and get your new project
     my_project = [
-        p
-        for p in api.projects.query(limit=100).all()
-        if p.name == new_project_name
+        p for p in api.projects.query(limit=100).all() if p.name == new_project_name
     ][0]
 
     print("Your new project {} has been created.".format(my_project.name))
