@@ -10,8 +10,8 @@ import datetime
 # Arguments
 parser = argparse.ArgumentParser(
     prog="Import Files to a Cavatica Project from S3",
-    description="""Compare the list of files from the Broad Google
-                   bucket to our equivelent aws bucket.
+    description="""Import files from a cavatica volume to a cavatica project.
+                    This will create the project if it does not already exist.
                    """,
 )
 
@@ -27,6 +27,16 @@ parser.add_argument(
     metavar="Cavatica project name",
     type=str,
     help="""Name of the project in cavatica where the files should be put.""",
+)
+
+parser.add_argument(
+    "--db_connection_url",
+    metavar="connection url to query",
+    type=str,
+    help="""URL to the database that will be queried to retrieve file 
+            information. e.g.:
+            postgresql://username:password@localhost:5432/postgres
+            """,
 )
 
 parser.add_argument(
@@ -52,9 +62,9 @@ parser.add_argument(
     metavar="SBG Billing Group for new projects",
     type=str,
     help="""Billing group to use if setting up a new project.
-            Default is 'Kids First DRC'
+            Default is 'CBTN'
             """,
-    default="Kids First DRC",
+    default="CBTN",
 )
 parser.add_argument(
     "--project_description",
@@ -163,7 +173,7 @@ gf_ids = pd.read_csv(args.file_list, header=None)[0].unique()
 
 # Conver gf_ids into file names
 
-connection_url = os.environ["DATABASE_URL"]
+connection_url = args.db_connection_url
 
 
 def fetch_data_view(query, vars=None):
@@ -196,6 +206,7 @@ file_table = fetch_data_view(
     """,
     (tuple(gf_ids),),
 )
+
 
 def strip_path(path):
     _, _, fname = path.rpartition("/")
