@@ -85,7 +85,13 @@ print(f"Args: {args.__dict__}")
 
 
 config_file = sbg.Config(profile=args.sbg_profile)
-api = sbg.Api(config=config_file)
+api = sbg.Api(
+    config=config_file,
+    error_handlers=[
+        sbg.http.error_handlers.rate_limit_sleeper,
+        sbg.http.error_handlers.maintenance_sleeper,
+    ],
+)
 
 # Volume Set up -----
 
@@ -231,24 +237,6 @@ def bulk_import_files(file_df, volume, project, overwrite=True, chunk_size=100):
     final_responses = []
     # import files in batches of 100 each
     for i in range(0, len(file_df), chunk_size):
-        # check the rate limiting
-        if i > 0:
-            remaining = final_responses[-1]._api.remaining
-            reset_time = final_responses[-1]._api.reset_time
-            if remaining < (2 * ((i + chunk_size) - i)):
-                time_delta = reset_time - datetime.datetime.now()
-                if time_delta.total_seconds() > 0:
-                    print(
-                        "Rate limit will be reached soon.",
-                        "Rate limit will be reset at",
-                        reset_time,
-                        ".\n",
-                        "Waiting",
-                        time_delta.total_seconds(),
-                        "seconds.",
-                    )
-                    time.sleep(time_delta.total_seconds())
-
         print("importing files:", i, ":", i + chunk_size)
         # setup list of dictionary with import requests
         imports = [
