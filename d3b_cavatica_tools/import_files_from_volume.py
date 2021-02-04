@@ -220,15 +220,40 @@ def strip_path(path):
 
 def is_running(response):
     if not response.valid or response.resource.error:
-        raise Exception(
-            "\n".join(
-                [
-                    str(response.resource.error),
-                    response.resource.error.message,
-                    response.resource.error.more_info,
-                ]
+        # breakpoint()
+        if not response.valid:
+            raise Exception(
+                "\n".join(
+                    [
+                        str(response.resource.error),
+                        response.resource.error.message,
+                        response.resource.error.more_info,
+                    ]
+                )
             )
-        )
+        elif response.resource.error.code == 9108:
+            print("Job ID: ", response.resource.id)
+            print("href: ", response.resource.href)
+            print("Source: ", response.resource.source)
+            print("destination: ", response.resource.destination)
+            print(
+                "\n".join(
+                    [
+                        response.resource.error.message,
+                        response.resource.error.more_info,
+                    ]
+                )
+            )
+        else:
+            raise Exception(
+                "\n".join(
+                    [
+                        str(response.resource.error),
+                        response.resource.error.message,
+                        response.resource.error.more_info,
+                    ]
+                )
+            )
     return response.resource.state not in ["COMPLETED", "FAILED", "ABORTED"]
 
 
@@ -288,8 +313,8 @@ file_df = pd.DataFrame(
         "genomic_file_external_id",
     ),
 ).drop_duplicates()
-
 print("about to import", len(file_df), "files")
+breakpoint()
 
 # Run the import Job
 responses = bulk_import_files(
