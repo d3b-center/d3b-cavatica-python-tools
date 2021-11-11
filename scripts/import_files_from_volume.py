@@ -1,10 +1,12 @@
-import sevenbridges as sbg
 import argparse
+import datetime
+import json
+import time
+
 import pandas as pd
 import psycopg2
-import time
-import json
-import datetime
+import sevenbridges as sbg
+from d3b_cavatica_tools.logging import get_logger
 
 # Arguments
 parser = argparse.ArgumentParser(
@@ -74,9 +76,20 @@ parser.add_argument(
     default="Delivery project automatically created for you.",
 )
 
+parser.add_argument(
+    "--log_level",
+    metavar="Logging Level",
+    type=str,
+    help="""Logging level to use. One of: "DEBUG", "INFO", "WARNING", "ERROR"
+, "CRITICAL"
+            """,
+    default="INFO",
+)
+
+logger = get_logger(__name__, testing_mode=False)
 
 args = parser.parse_args()
-print(f"Args: {args.__dict__}")
+logger.info(f"Args: {args.__dict__}")
 
 # Check if the file list exists
 # if not os.path.isfile(args.file_list):
@@ -101,12 +114,14 @@ all_volumes = api.volumes.query(limit=100)
 my_volume = [v for v in all_volumes.all() if v.name == volume_name]
 
 if not my_volume:
-    print("Volume {} does not exist, check name / mounting".format(volume_name))
+    logger.error(
+        "Volume {} does not exist, check name / mounting".format(volume_name)
+    )
     raise KeyboardInterrupt
 else:
     my_volume = my_volume[0]
 
-print("Volume {} found.".format(my_volume.name))
+logger.info("Volume {} found.".format(my_volume.name))
 
 
 # Project Setup -----
@@ -121,7 +136,7 @@ my_billing_group = [
     bg for bg in billing_groups.all() if bg.name == args.billing_group
 ]
 if not my_billing_group:
-    print(
+    logger.error(
         "Billing Group {} does not exist, check name / mounting".format(
             args.billing_group
         )
@@ -133,11 +148,13 @@ else:
 # check if this project already exists. LIST all projects and check for name
 #  match
 my_project = [
-    p for p in api.projects.query(limit=100).all() if p.name == new_project_name
+    p
+    for p in api.projects.query(limit=100).all()
+    if p.name == new_project_name
 ]
 
 if my_project:
-    print(
+    logger.info(
         "A project with the name {} already exists, skipping creation".format(
             new_project_name
         )
@@ -164,13 +181,17 @@ else:
         if p.name == new_project_name
     ][0]
 
-    print("Your new project {} has been created.".format(my_project.name))
+    logger.info(
+        "Your new project {} has been created.".format(my_project.name)
+    )
     if hasattr(my_project, "description"):
-        print("Project description: {} \n".format(my_project.description))
+        logger.info(
+            "Project description: {} \n".format(my_project.description)
+        )
 
 my_files = api.files.query(limit=100, project=my_project)
 if my_files.total == 0:
-    print("no files in the project")
+    logger.debug("no files in the project")
 
 
 # File Import -----
@@ -218,31 +239,44 @@ def strip_path(path):
     return fname
 
 
+def get_key(path):
+    if path.startswith("s3://"):
+        _, _, key = path.replace("s3://", "").partition("/")
+        return key
+    else:
+        return path
+
+
 def is_running(response):
     if not response.valid or response.resource.error:
-        raise Exception(
-            "\n".join(
-                [
-                    str(response.resource.error),
-                    response.resource.error.message,
-                    response.resource.error.more_info,
-                ]
+        if not response.valid:
+            breakpoint()
+        else:
+            raise Exception(
+                "\n".join(
+                    [
+                        str(response.resource.error),
+                        response.resource.error.message,
+                        response.resource.error.more_info,
+                    ]
+                )
             )
-        )
     return response.resource.state not in ["COMPLETED", "FAILED", "ABORTED"]
 
 
-def bulk_import_files(file_df, volume, project, overwrite=True, chunk_size=100):
+def bulk_import_files(
+    file_df, volume, project, overwrite=True, chunk_size=100
+):
     "Imports list of files from volume in bulk"
     final_responses = []
     # import files in batches of 100 each
     for i in range(0, len(file_df), chunk_size):
-        print("importing files:", i, ":", i + chunk_size)
+        logger.info(f"importing files: {i}:{i + chunk_size}")
         # setup list of dictionary with import requests
         imports = [
             {
                 "volume": volume,
-                "location": row["genomic_file_external_id"],
+                "location": get_key(row["genomic_file_external_id"]),
                 "project": project,
                 "name": strip_path(row["genomic_file_external_id"]),
                 "overwrite": True,
@@ -289,8 +323,7 @@ file_df = pd.DataFrame(
     ),
 ).drop_duplicates()
 
-print("about to import", len(file_df), "files")
-
+logger.info(f"about to import {len(file_df)} files")
 # Run the import Job
 responses = bulk_import_files(
     file_df=file_df,
@@ -298,7 +331,7 @@ responses = bulk_import_files(
     project=my_project,
 )
 
-print("Checking to see job status")
+logger.info("Checking to see job status")
 # Check to see if all the jobs completed
 jobs = []
 failed_jobs = []
@@ -317,8 +350,8 @@ for job in responses:
         "result": j.result,
         "error": j.error,
     }
-    print("Job ID:", j.id)
-    print("Status:", j.state)
+    logger.info("Job ID:", j.id)
+    logger.info("Status:", j.state)
     if j.state == "COMPLETED":
         job_dict["result"] = {
             "href": j.result.href,
@@ -335,9 +368,9 @@ for job in responses:
             "more_info": j.error.more_info,
         }
         failed_jobs.append(job)
-        print("error code: ", j.error.code)
-        print("error message:", j.error.message)
-        print("error info:", j.error.more_info)
+        logger.error("error code: ", j.error.code)
+        logger.error("error message:", j.error.message)
+        logger.error("error info:", j.error.more_info)
     print("\n")
     jobs.append(job_dict)
 
@@ -346,4 +379,4 @@ with open("job_report.json", "w+") as f:
 
 
 if failed_jobs:
-    print("There were", len(failed_jobs), "failed jobs")
+    logger.error("There were", len(failed_jobs), "failed jobs")
