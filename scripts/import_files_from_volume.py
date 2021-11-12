@@ -121,7 +121,7 @@ if not my_volume:
 else:
     my_volume = my_volume[0]
 
-logger.info("Volume {} found.".format(my_volume.name))
+logger.info(f"Volume {my_volume.name} found.")
 
 
 # Project Setup -----
@@ -182,11 +182,11 @@ else:
     ][0]
 
     logger.info(
-        "Your new project {} has been created.".format(my_project.name)
+        f"Your new project {my_project.name} has been created."
     )
     if hasattr(my_project, "description"):
         logger.info(
-            "Project description: {} \n".format(my_project.description)
+            f"Project description: {my_project.description} \n"
         )
 
 my_files = api.files.query(limit=100, project=my_project)
@@ -380,3 +380,4 @@ with open("job_report.json", "w+") as f:
 
 if failed_jobs:
     logger.error("There were", len(failed_jobs), "failed jobs")
+if __name__ == "__main__":
