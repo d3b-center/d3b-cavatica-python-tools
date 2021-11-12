@@ -1,5 +1,4 @@
 import argparse
-import datetime
 import json
 import time
 
@@ -200,9 +199,7 @@ if __name__ == "__main__":
 
     if not my_volume:
         logger.error(
-            "Volume {} does not exist, check name / mounting".format(
-                volume_name
-            )
+            f"Volume {volume_name} does not exist, check name / mounting"
         )
         raise KeyboardInterrupt
     else:
@@ -223,9 +220,7 @@ if __name__ == "__main__":
     ]
     if not my_billing_group:
         logger.error(
-            "Billing Group {} does not exist, check name / mounting".format(
-                args.billing_group
-            )
+            f"Billing Group {args.billing_group} does not exist, check name / mounting"  # noqa
         )
         raise KeyboardInterrupt
     else:
@@ -241,9 +236,7 @@ if __name__ == "__main__":
 
     if my_project:
         logger.info(
-            "A project with the name {} already exists, skipping creation".format(
-                new_project_name
-            )
+            f"A project with the name {new_project_name} already exists, skipping creation"
         )
         my_project = my_project[0]
     else:
