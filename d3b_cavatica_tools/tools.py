@@ -1,6 +1,7 @@
-import psycopg2
 import os
+
 import pandas as pd
+import psycopg2
 from tqdm import tqdm
 
 print(os.environ["DATABASE_URL"])

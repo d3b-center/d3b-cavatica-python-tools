@@ -1,9 +1,10 @@
-import sevenbridges as sbg
 import argparse
-import os
 import csv
-import boto3
+import os
 import time
+
+import boto3
+import sevenbridges as sbg
 
 breakpoint()
 # print datetime.datetime.now()
@@ -55,8 +56,9 @@ while len(task_list) or len(exports) > 0:
                     edict["kid"] = i["kid"]
                     edict["tid"] = i["tid"]
                     exports.append(edict)
-                except:
+                except Exception as e:
                     print("{} can't be export.".format(f.name))
+                    print(e)
                     continue
     # print datetime.datetime.now(), "now check status"
     for e in exports:
