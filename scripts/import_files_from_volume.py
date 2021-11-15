@@ -5,7 +5,7 @@ import time
 import pandas as pd
 import psycopg2
 import sevenbridges as sbg
-from d3b_cavatica_tools.logging import get_logger
+from d3b_cavatica_tools.utils.logging import get_logger
 
 
 def get_args():
