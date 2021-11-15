@@ -4,8 +4,6 @@ import pandas as pd
 import psycopg2
 from tqdm import tqdm
 
-print(os.environ["DATABASE_URL"])
-
 
 def read_cavatica_cli_filelist(filepath_or_buffer):
     """"""
