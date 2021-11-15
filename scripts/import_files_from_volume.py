@@ -224,7 +224,7 @@ if __name__ == "__main__":
 
     if my_project:
         logger.info(
-            f"A project with the name {new_project_name} already exists, skipping creation"
+            f"Project {new_project_name} already exists, skipping creation"
         )
         my_project = my_project[0]
     else:
