@@ -5,6 +5,7 @@ import time
 import pandas as pd
 import psycopg2
 import sevenbridges as sbg
+from d3b_cavatica_tools.utils.common import get_key, strip_path
 from d3b_cavatica_tools.utils.logging import get_logger
 
 
@@ -95,19 +96,6 @@ def fetch_data_view(query, vars=None):
     resp = cur.fetchall()
     cur.close()
     return resp
-
-
-def strip_path(path):
-    _, _, fname = path.rpartition("/")
-    return fname
-
-
-def get_key(path):
-    if path.startswith("s3://"):
-        _, _, key = path.replace("s3://", "").partition("/")
-        return key
-    else:
-        return path
 
 
 def is_running(response):
