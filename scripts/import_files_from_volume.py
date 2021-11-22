@@ -5,7 +5,8 @@ import time
 import pandas as pd
 import psycopg2
 import sevenbridges as sbg
-from d3b_cavatica_tools.logging import get_logger
+from d3b_cavatica_tools.utils.common import get_key, strip_path
+from d3b_cavatica_tools.utils.logging import get_logger
 
 
 def get_args():
@@ -97,19 +98,6 @@ def fetch_data_view(query, vars=None):
     return resp
 
 
-def strip_path(path):
-    _, _, fname = path.rpartition("/")
-    return fname
-
-
-def get_key(path):
-    if path.startswith("s3://"):
-        _, _, key = path.replace("s3://", "").partition("/")
-        return key
-    else:
-        return path
-
-
 def is_running(response):
     if not response.valid or response.resource.error:
         if not response.valid:
@@ -139,9 +127,9 @@ def bulk_import_files(
         imports = [
             {
                 "volume": volume,
-                "location": get_key(row["genomic_file_external_id"]),
+                "location": get_key(row["url"]),
                 "project": project,
-                "name": strip_path(row["genomic_file_external_id"]),
+                "name": strip_path(row["url"]),
                 "overwrite": True,
                 "metadata": {
                     "Kids First Participant ID": row["participant_id"],
@@ -236,7 +224,7 @@ if __name__ == "__main__":
 
     if my_project:
         logger.info(
-            f"A project with the name {new_project_name} already exists, skipping creation"
+            f"Project {new_project_name} already exists, skipping creation"
         )
         my_project = my_project[0]
     else:
@@ -269,49 +257,32 @@ if __name__ == "__main__":
         logger.debug("no files in the project")
 
     # File Import -----
-    gf_ids = pd.read_csv(args.file_list, header=None)[0].unique()
+    gf_ids = pd.read_csv(args.file_list, header=None)[0].to_list()
 
-    # Conver gf_ids into file names
+    # Convert gf_ids into file names
 
     connection_url = args.db_connection_url
-
     conn = psycopg2.connect(connection_url)
-
-    file_table = fetch_data_view(
-        """
-            SELECT bs.participant_id,
+    query = f"""
+    SELECT bs.participant_id,
                 bsgf.biospecimen_id,
                 p.family_id,
                 ox.vital_status,
                 p.ethnicity,
                 p.race,
                 p.gender,
-                gf.kf_id,
-                gf.external_id
-            FROM participant p
-            JOIN biospecimen bs ON p.kf_id = bs.participant_id
-            JOIN biospecimen_genomic_file bsgf ON bs.kf_id = bsgf.biospecimen_id
-            JOIN genomic_file gf ON gf.kf_id = bsgf.genomic_file_id
-            LEFT JOIN outcome ox ON ox.participant_id = p.kf_id
-            WHERE gf.kf_id in %s
-        """,
-        (tuple(gf_ids),),
-    )
+                bsgf.genomic_file_id,
+                idx_scrape.url
+    FROM participant p
+    JOIN biospecimen bs ON p.kf_id = bs.participant_id
+    JOIN biospecimen_genomic_file bsgf ON bs.kf_id = bsgf.biospecimen_id
+    JOIN genomic_file gf ON gf.kf_id = bsgf.genomic_file_id
+    LEFT JOIN outcome ox ON ox.participant_id = p.kf_id
+    LEFT JOIN file_metadata.indexd_scrape idx_scrape on gf.latest_did = idx_scrape.did
+    WHERE gf.kf_id in ({str(gf_ids)[1:-1]})
+    """
 
-    file_df = pd.DataFrame(
-        file_table,
-        columns=(
-            "participant_id",
-            "biospecimen_id",
-            "family_id",
-            "vital_status",
-            "ethnicity",
-            "race",
-            "gender",
-            "genomic_file_id",
-            "genomic_file_external_id",
-        ),
-    ).drop_duplicates()
+    file_df = pd.read_sql(query, conn)
 
     logger.info(f"about to import {len(file_df)} files")
     # Run the import Job
