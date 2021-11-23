@@ -1,12 +1,15 @@
 import argparse
 import json
 import time
+from logging import Logger
 
 import pandas as pd
 import psycopg2
 import sevenbridges as sbg
 from d3b_cavatica_tools.utils.common import get_key, strip_path
 from d3b_cavatica_tools.utils.logging import get_logger
+from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 
 def get_args():
@@ -103,13 +106,15 @@ def is_running(response):
         if not response.valid:
             breakpoint()
         else:
-            raise Exception(
-                "\n".join(
+            logger.error(
+                "\n\t".join(
                     [
+                        "Import Job Error:",
                         str(response.resource.error),
                         response.resource.error.message,
                         response.resource.error.more_info,
                     ]
+                    + [f"{k}: {v}" for k, v in response.resource._old.items()]
                 )
             )
     return response.resource.state not in ["COMPLETED", "FAILED", "ABORTED"]
@@ -142,18 +147,19 @@ def bulk_import_files(
         # initiate bulk import of batch and wait until finished
         responses = api.imports.bulk_submit(imports)
         while any([is_running(r) for r in responses]):
+            logger.debug("Waiting 10 seconds for the jobs to complete")
             time.sleep(10)
             responses = api.imports.bulk_get([r.resource for r in responses])
         response_iter = iter(responses)
         for import_item in imports:
             import_item["response"] = next(response_iter)
         # set the metadata on each file
-        result_list = [r.resource.result for r in final_responses]
         files = []
         for import_item in imports:
-            file_ = import_item["response"].resource.result
-            file_.metadata = import_item["metadata"]
-            files.append(file_)
+            if import_item["response"].resource.state == "COMPLETED":
+                file_ = import_item["response"].resource.result
+                file_.metadata = import_item["metadata"]
+                files.append(file_)
         file_responses = api.files.bulk_edit(files)
         final_responses.extend(responses)
     return final_responses
@@ -162,6 +168,7 @@ def bulk_import_files(
 if __name__ == "__main__":
     logger = get_logger(__name__, testing_mode=False)
     args = get_args()
+    logger.setLevel(args.log_level)
     logger.info(f"Args: {args.__dict__}")
 
     # Check if the file list exists
@@ -291,52 +298,71 @@ if __name__ == "__main__":
         volume=my_volume,
         project=my_project,
     )
-
-    logger.info("Checking to see job status")
+    logger.info("Building job reports. This may take a few minutes.")
     # Check to see if all the jobs completed
     jobs = []
     failed_jobs = []
-    for job in responses:
-        j = job.resource
-        job_dict = {
-            "id": j.id,
-            "state": j.state,
-            "source_volume": j.source.volume,
-            "source_location": j.source.location,
-            "destination_project": j.destination.project,
-            "destination_name": j.destination.name,
-            "href": j.href,
-            "started_on": j.started_on,
-            "finished_on": j.finished_on,
-            "result": j.result,
-            "error": j.error,
-        }
-        logger.info("Job ID:", j.id)
-        logger.info("Status:", j.state)
-        if j.state == "COMPLETED":
-            job_dict["result"] = {
-                "href": j.result.href,
-                "id": j.result.id,
-                "is_folder": j.result.is_folder(),
-                "modified_on": j.result.modified_on,
-                "name": j.result.name,
+    with logging_redirect_tqdm():
+        for job in tqdm(responses):
+            j = job.resource
+            job_dict = {
+                "id": j.id,
+                "state": j.state,
+                "source_volume": j.source.volume,
+                "source_location": j.source.location,
+                "destination_project": j.destination.project,
+                "destination_name": j.destination.name,
+                "href": j.href,
+                "started_on": j.started_on,
+                "finished_on": j.finished_on,
+                "result": j.result,
+                "error": j.error,
             }
-        if j.state == "FAILED":
-            job_dict["error"] = {
-                "code": j.error.code,
-                "status": j.error.status,
-                "message": j.error.message,
-                "more_info": j.error.more_info,
-            }
-            failed_jobs.append(job)
-            logger.error("error code: ", j.error.code)
-            logger.error("error message:", j.error.message)
-            logger.error("error info:", j.error.more_info)
-        print("\n")
-        jobs.append(job_dict)
+            logger.debug(f"Job ID: {job_dict['id']}")
+            if j.state == "COMPLETED":
+                job_dict["result"] = {
+                    "href": job.resource.result.href,
+                    "id": job.resource.result.id,
+                    "is_folder": job.resource.result.is_folder(),
+                    "modified_on": job.resource.result.modified_on,
+                    "name": job.resource.result.name,
+                }
+            elif j.state == "FAILED":
+                job_dict["error"] = {
+                    "code": j.error.code,
+                    "status": j.error.status,
+                    "message": j.error.message,
+                    "more_info": j.error.more_info,
+                }
+                failed_jobs.append(job_dict)
+                logger.error(
+                    "\n\t".join(
+                        [
+                            "Job info",
+                            f"Job ID: {j.id}",
+                            f"Status: {j.state}",
+                            f"error code: {j.error.code}",
+                            f"error message: {j.error.message}",
+                            f"error info: {j.error.more_info}",
+                        ]
+                    )
+                )
+            else:
+                logger.error(
+                    "\n\t".join(
+                        [
+                            "other job status",
+                            f"Job ID: {j.id}",
+                            f"Status: {j.state}",
+                        ]
+                    )
+                )
+            jobs.append(job_dict)
 
     with open("job_report.json", "w+") as f:
         json.dump(jobs, f, indent=4, default=str)
 
     if failed_jobs:
-        logger.error("There were", len(failed_jobs), "failed jobs")
+        logger.error(f"There were {len(failed_jobs)} failed jobs")
+        with open("job_report_errors.json", "w+") as f:
+            json.dump(failed_jobs, f, indent=4, default=str)
