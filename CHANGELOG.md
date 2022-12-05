@@ -1,5 +1,17 @@
 # D3b Cavatica Python Tools Change History
 
+## Release 0.2.1
+
+### Summary
+
+- Emojis: 🚑️ x1
+- Categories: Other Changes x1
+
+### New features and changes
+
+- [#10](https://github.com/d3b-center/d3b-cavatica-python-tools/pull/10) - 🚑️ init.py for utils - [3702dba5](https://github.com/d3b-center/d3b-cavatica-python-tools/commit/3702dba5936a54af06e2d1c19b18664b8fb27ef0) by [chris-s-friedman](https://github.com/chris-s-friedman)
+
+
 ## Release 0.2.0
 
 ### Summary
